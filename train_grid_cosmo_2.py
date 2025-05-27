@@ -47,7 +47,7 @@ exp = exp[:-1]
 print('Experiment Run: ', exp)
 
 # Set up exp dir
-exp_str = './exp/'
+exp_str = '../exp/'
 makedir(exp_str + exp)
 makedir(exp_str + exp + '/checkpoints')
 makedir(exp_str + exp + '/eta_out')
@@ -257,8 +257,6 @@ elif args.lam == 0:
     lossfn = lossfn_noreg 
 else: 
     lossfn = lossfn_meanreg
-
-early_stop = args.shape_sigma > 0.
 
 for i in (pbar := tqdm(range(1, num_iters+1))):
     loss, loss_meas, loss_reg, _, opt_state, rand_key, grad_norm = train_step(fwd_model_train_batch, pws, target, opt_state, lossfn, rand_key)

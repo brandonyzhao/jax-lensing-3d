@@ -20,7 +20,7 @@ def radial_profile(data):
   radialprofile = tbin / nr
   return radialprofile
 
-def measure_power_spectrum(map_data, length=None):
+def measure_power_spectrum(map_data):
   """
   measures power 2d data
   :param power: map
@@ -34,10 +34,10 @@ def measure_power_spectrum(map_data, length=None):
   r = jnp.sqrt((x)**2 + (y)**2)
   r = r.astype('int32')
 
-  tbin = jnp.bincount(r.ravel(), data.ravel(), length=length)
-  nr = jnp.bincount(r.ravel(), length=length)
+  tbin = jnp.bincount(r.ravel(), data.ravel())
+  nr = jnp.bincount(r.ravel())
   radialprofile = tbin / nr
 
   return radialprofile / (2 * jnp.pi)**2
 
-measure_spectra = jax.vmap(measure_power_spectrum, in_axes = (2,None))
+measure_spectra = jax.vmap(measure_power_spectrum, in_axes=(2,))
