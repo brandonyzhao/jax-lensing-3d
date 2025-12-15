@@ -3,6 +3,7 @@ from tqdm import tqdm
 import os
 from functools import partial
 import argparse
+import pdb
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', type=str, default='0', help='Visible GPU IDs')
@@ -10,10 +11,11 @@ parser.add_argument('-vol', type=str, default='pm0', help='Volume to recover')
 parser.add_argument('-L', type=int, default=2, help='Positional degree (xy)')
 parser.add_argument('-Lz', type=int, default=5, help='Positional encoding degree (z)')
 parser.add_argument('-proj', type=str, default='gg', help='Projection Type')
-parser.add_argument('-gpp', type=int, default=1, help='Galaxies per Shear Pixel')
-parser.add_argument('-shape_sigma', type=float, default=0., help='Standard deviation of shape noise')
+parser.add_argument('-gpp', type=int, default=64, help='Galaxies per Shear Pixel')
+parser.add_argument('-shape_sigma', type=float, default=0.035, help='Standard deviation of shape noise')
 parser.add_argument('-lam', type=float, default=5., help='Power Spectrum Regularization Weight')
 parser.add_argument('-init_seed', type=int, default=0, help='Initialization seed for MLP weights')
+parser.add_argument('--debug', action='store_true')
 args = parser.parse_args()
 
 os.environ['CUDA_VISIBLE_DEVICES'] = args.d
@@ -38,7 +40,7 @@ from shear.spectral import measure_spectra
 
 exp = ''
 for key in vars(args).keys(): 
-    if key != 'd':
+    if key != 'd' and key != 'init_seed' and key != 'debug':
         exp += key
         exp += '_'
         exp += str(vars(args)[key])
@@ -48,12 +50,16 @@ print('Experiment Run: ', exp)
 
 # Set up exp dir
 exp_str = '../exp/'
-makedir(exp_str + exp)
-makedir(exp_str + exp + '/checkpoints')
-makedir(exp_str + exp + '/eta_out')
-makedir(exp_str + exp + '/density')
+exp_path = os.path.join(exp_str, exp, str(args.init_seed))
+makedir(exp_path)
+makedir(exp_path + '/density')
+
+pdb.set_trace()
 
 rand_key = jax.random.PRNGKey(1)
+
+if args.debug: 
+    compare_path = '/srv/tmp/brandon/shear-nf/exp_ensemble_pwfix/vol_pm%d_good_L_2_Lz_5_meas_shear_proj_gg_gpp_64_shape_sigma_0.035_fake_noise_0.0_lam_5.0_init_seed_%d_down_scale_1_clip_False_photoz_False_source_combo_False_early_stop_False_no_interp_True_no_cone_True/'%(0, args.init_seed)
 
 # ========================================================
 # Load Dark Matter Field
@@ -62,6 +68,8 @@ rand_key = jax.random.PRNGKey(1)
 # Particle mesh simulation output
 if args.vol == 'pm0': 
     lensplanes = jnp.load('./pm_fields/pm0.npy', allow_pickle=True)
+elif args.vol == 'pm0_hires': 
+    lensplanes = jnp.load('./pm_fields/pm0_hires.npy', allow_pickle=True)
 else: 
     raise ValueError
 
@@ -92,7 +100,12 @@ eta_MLP = MLP(net_depth=4,
 init_key = jax.random.PRNGKey(args.init_seed)
 mlp_params_eta = eta_MLP.init(init_key, jnp.ones([3]))['params']
 
-num_iters = 10000
+if args.debug: 
+    from shear.debug import summarize_params
+    print("===== MLP PARAM STATS =====")
+    summarize_params(mlp_params_eta)
+
+num_iters = 100_000
 lr_init = 1e-4
 lr_final = 5e-6
 tx = optax.adam(lambda x : jnp.exp(jnp.log(lr_init) * (1 - (x/num_iters)) + jnp.log(lr_final) * (x/num_iters)), nesterov=True)
@@ -269,3 +282,13 @@ for i in (pbar := tqdm(range(1, num_iters+1))):
 
         pbar.set_description('Loss Meas: %f Loss Reg: %f'% (loss_meas, loss_reg))
         jnp.save(open(exp_str + exp + '/density/density_%d.p'%(i//test_iter), 'wb'), od_nn)
+
+        if args.debug: 
+            summarize_params(opt_state.params, label=f"@ step {i}")
+            compare_vol = jnp.load(compare_path + '/density/density_%d.p'%(i//test_iter))
+            print('===============================================')
+            print(f"Intermediate od_nn shape: {od_nn.shape}")
+            print(f"mean: {jnp.mean(od_nn):.5f}, std: {jnp.std(od_nn):.5f}, min: {jnp.min(od_nn):.5f}, max: {jnp.max(od_nn):.5f}")
+            print('Matches with correct previous run: ')
+            print(jnp.array_equal(od_nn, compare_vol))
+            pdb.set_trace()

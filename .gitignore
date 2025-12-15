@@ -1,2 +1,6 @@
 exp/
-*.ipynb
+# *.ipynb
+*.pdf
+*.svg
+*.png
+*.mp4

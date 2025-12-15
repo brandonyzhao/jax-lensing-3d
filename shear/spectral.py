@@ -1,6 +1,8 @@
 from jax import numpy as jnp
 import jax
 
+import pdb
+
 # The following code is adapted from jax_lensing package: 
 # https://github.com/CosmoStat/jax-lensing
 
@@ -20,7 +22,7 @@ def radial_profile(data):
   radialprofile = tbin / nr
   return radialprofile
 
-def measure_power_spectrum(map_data):
+def measure_power_spectrum(map_data, length=None):
   """
   measures power 2d data
   :param power: map
@@ -33,11 +35,24 @@ def measure_power_spectrum(map_data):
   x, y = jnp.meshgrid(freqs, freqs)
   r = jnp.sqrt((x)**2 + (y)**2)
   r = r.astype('int32')
-
-  tbin = jnp.bincount(r.ravel(), data.ravel())
-  nr = jnp.bincount(r.ravel())
+  tbin = jnp.bincount(r.ravel(), data.ravel(), length=length)
+  nr = jnp.bincount(r.ravel(), length=length)
   radialprofile = tbin / nr
 
   return radialprofile / (2 * jnp.pi)**2
 
-measure_spectra = jax.vmap(measure_power_spectrum, in_axes=(2,))
+measure_spectra = jax.vmap(measure_power_spectrum, in_axes = (2,None))
+
+def measure_power_spectrum_2(map_data):
+  """
+  measures power 2d data
+  :param power: map
+  :return: power spectrum
+  """
+  field_npix = map_data.shape[0]
+  data_ft = jnp.fft.fft2(map_data) / field_npix
+  data = jnp.real(data_ft * jnp.conj(data_ft))
+
+  return data
+
+measure_spectra_2 = jax.vmap(measure_power_spectrum_2, in_axes = (2,))

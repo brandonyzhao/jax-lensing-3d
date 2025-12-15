@@ -23,3 +23,18 @@ def optimal_blur(density_gt, density_recon, sigma_xys, sigma_zs):
                 optimal_sig_xy = sig_xy 
                 optimal_sig_z = sig_z 
     return optimal_cc, optimal_density_gt, optimal_sig_xy, optimal_sig_z
+
+
+def mean_subtract(arr, axis=1): 
+    return arr - jnp.mean(arr, axis=axis, keepdims=True)
+
+def shear_mse(arr1, arr2): 
+    arr1 = mean_subtract(arr1)
+    arr2 = mean_subtract(arr2)
+
+    return jnp.mean(jnp.square(arr1 - arr2))
+
+def shear_psnr(gt, recon): 
+    maxval = jnp.abs(mean_subtract(gt)).max()
+    mse = shear_mse(gt, recon)
+    return 10 * jnp.log10(maxval**2 / (mse + 1e-8))
